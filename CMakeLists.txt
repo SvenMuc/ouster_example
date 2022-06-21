@@ -4,7 +4,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 include(DefaultBuildType)
 
 # ==== Project Name ====
-project(ouster_example VERSION 20210608)
+project(ouster_example VERSION 20220608)
 
 # ==== Options ====
 option(CMAKE_POSITION_INDEPENDENT_CODE "Build position independent code." ON)
@@ -12,24 +12,33 @@ option(BUILD_SHARED_LIBS "Build shared libraries." OFF)
 option(BUILD_PCAP "Build pcap utils." OFF)
 option(BUILD_TESTING "Build tests" OFF)
 option(BUILD_VIZ "Build Ouster visualizer." ON)
+option(BUILD_EXAMPLES "Build C++ examples" OFF)
 
-set(CMAKE_CXX_STANDARD 11)
-if(MSVC)
-  add_compile_options(/W3)
-  add_compile_definitions(NOMINMAX _USE_MATH_DEFINES WIN32_LEAN_AND_MEAN)
-else()
-  add_compile_options(-Wall -Wextra -Werror)
-endif()
+# when building as a top-level project and not as conan library
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  if(NOT "${CMAKE_CXX_STANDARD}")
+    set(CMAKE_CXX_STANDARD 11)
+  endif()
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# === Testing ===
-if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
-    include(CTest)
+  if(NOT "${CMAKE_CXX_EXTENSIONS}")
+    set(CMAKE_CXX_EXTENSIONS OFF)
+  endif()
+
+  if(MSVC)
+    add_compile_options(/W3)
+    add_compile_definitions(NOMINMAX _USE_MATH_DEFINES WIN32_LEAN_AND_MEAN)
+  else()
+    add_compile_options(-Wall -Wextra -Werror -Wno-error=deprecated-declarations)
+  endif()
+
+  include(CTest)
 endif()
 
 # === Subdirectories ===
 add_subdirectory(ouster_client)
 
-if(BUILD_PCAP)
+if(BUILD_PCAP OR BUILD_EXAMPLES)
   add_subdirectory(ouster_pcap)
 endif()
 
@@ -37,8 +46,16 @@ if(BUILD_VIZ)
   add_subdirectory(ouster_viz)
 endif()
 
-if (CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME AND BUILD_TESTING)
+if(BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+  message(STATUS "Ouster SDK client: Using EIGEN_MAX_ALIGN_BYTES = 32")
+  target_compile_definitions(ouster_client PUBLIC EIGEN_MAX_ALIGN_BYTES=32)
+  if(BUILD_TESTING)
     add_subdirectory(tests)
+  endif()
 endif()
 
 # ==== Install ====
@@ -81,7 +98,6 @@ set(CPACK_SOURCE_IGNORE_FILES /.git /dist)
 set(CPACK_DEBIAN_PACKAGE_NAME ouster-sdk)
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "cmake, libjsoncpp-dev, libtclap-dev, libeigen3-dev,
-  libglfw3-dev, libglew-dev, libtins-dev, libpcap-dev")
+  libglfw3-dev, libglew-dev")
 
 include(CPack)
-
